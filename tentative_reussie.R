@@ -1,4 +1,5 @@
 #les données
+library(invgamma)
 K <- 120
 r1 <-
   c(3, 5, 2, 7, 7, 2, 5, 3, 5, 11, 6, 6, 11, 4, 4, 2, 8, 8, 6, 
@@ -42,78 +43,102 @@ year<-
     3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 
     6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 10)
 
-#un fonction qui nouq aide pour des calculs
-
-logit<- function(year,mu,alpha,beta1,beta2,b,K){
+logpsi<- function(year,mu,alpha,beta1,beta2,b,K){
   log<-rep(0, K)
   for (i in 1:K){
     log[i]<-mu[i]+alpha+beta1*year[i]+beta2*(year[i]^2-22)+b[i]}
   return(log)
 }
+invlogit<-function(x){
+  return(exp(x)/(1+exp(x)))
+}
 
-
-oxford <- function(year,n0,n1,r0,r1,K, nchain = 10^4, prop_sd = c(rep(2,120),2,6,2,2)){
+oxford0 <- function(year,n0,r0,K, nchain = 10^4, prop_sd = rep(1,120)){
   #les valeurs initiales 
-  alpha <- 0
-  beta1 <- 0
-  beta2 <- 0
-  sigma_sq <- 1
-  mu <- rep(0,K)
-  init <- c(mu,alpha,beta1,beta2,sigma_sq) #vecteurs de valeurs initiales
+  
+  init <- rep(0,K)
   #les valeurs initiales pour b,mu,beta1,beta2,sigma_sq sont données 
   #!!!!!! pour b je ne sais pas quoi faire :( car elle suit une lois normale de paramètre(0,sigma_sq) et sigma  _sq change....
-  b  <- rep(0,K)
   
   #la chaine vide K+4 variables les mu ,alpha ,beta1 ,beta2,sigma_sg
-
-  chain <- matrix(NA, nchain + 1, K+4)
+  
+  chain <- matrix(NA, nchain + 1, K)
   chain[1,] <- init
-  acc_rates <- rep(0, K+4)
+  acc.rates <- rep(0, K)
   
   sig<-1000 #c'est l'écart type pour les lois à priori de beta1,beta2,sugma_sq,mu
   
   for (iter in 1:nchain){
     current <- chain[iter,]
-    for (i in 1:K+4){
+    for (i in 1:K){
+       prop <- current
+      #pour les mu !!!
+      prop[i] <- rnorm(1, current[i], prop_sd[i])
+        ##noyau symétrique
+        #les formules données
+    
+      
+      top<-dnorm(prop[i],0,sig,log=TRUE)+dbinom(r0[i],n0[i],invlogit(prop[i]),log=TRUE)
+      bottom<-dnorm(current[i],0,sig,log=TRUE)+dbinom(r0[i],n0[i],invlogit(current[i]),log=TRUE)
+     acc.prob<-exp(top-bottom)
+      
+      if (runif(1) < acc.prob){
+        current <- prop
+        acc.rates[i] <- acc.rates[i] + 1}
+    }
+    ## Sauvegardons le nouvel etat
+    chain[iter+1,] <- current
+    
+  }
+  
+  return(list(chain = chain, acc.rates = acc.rates / nchain))
+}
+out0 <-oxford0(year,n0,r0,K)
+
+
+oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
+  #les valeurs initiales 
+  alpha <- 0
+  beta1 <- 0
+  beta2 <- 0
+  sigma_sq <- 1
+  b <- rep(0,K)
+  init <- c(alpha,beta1,beta2,sigma_sq) #vecteurs de valeurs initiales
+  
+  
+  chain <- matrix(NA, nchain + 1, 4)
+  chain[1,] <- init
+  acc_rates <- rep(0, 4)
+  
+  sig<-1000 #c'est l'écart type pour les lois à priori de beta1,beta2,sugma_sq,mu
+  
+  for (iter in 1:nchain){
+    current <- chain[iter,]
+    for (i in 1:4){
       
       
       prop <- current
-      if(i<=K){#pour les mu !!!
-      prop[i] <- rnorm(1, current[i], prop_sd[i])
-      ##noyau symétrique
-      #les formules données
-      top <-  prop[i]*r0[i]-(prop[i]^2)/(2*sig^2)+n0[i]*log(1+exp(prop[i]))
-      bottom <-  current[i]*r0[i]-(current[i]^2)/(2*sig^2)+n0[i]*log(1+exp(current[i]))
+      if(i==4){#pour sigma
+        
+        prop[i] <- rtruncnorm(1, a=0.01 , b=10^10 , current[i], prop_sd[i])
+        bottom_kernel <- dtruncnorm(prop[i], a=0.01 , b=10^10 , current[i], prop_sd[i])  #on a pas un noyau symetrique !
+        top_kernel <- dtruncnorm(current[i], a=0.01, b=10^10 , prop[i], prop_sd[i]) #on a pas un noyau symetrique !
+        
+                      
+        top<-dinvgamma(prop[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b^2,0,sqrt(prop[i]),log=TRUE))
+        bottom <-  dinvgamma(current[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b^2,0,sqrt(current[i]),log=TRUE))
       }
-      else if(i<K+4){#pour alpha ,beta1 ,beta2
+      else{#pour alpha ,beta1 ,beta2
         
-      prop[i] <- rnorm(1, current[i], prop_sd[i])
-      logit.prop<-logit(year,prop[1:K],prop[K+1],prop[K+2],prop[K+3],b,K)#juste pour simplifier les calculs
-      #top
-      top <-  sum(logit.prop*r1-n1*log(1+exp(logit.prop)))-prop[i]^2/(2*sig^2)
-      logit.current<-logit(year,current[1:K],current[K+1],current[K+2],current[K+3],b,K)
-      
-      bottom <-  sum(logit.current*r1-n1*log(1+exp(logit.current)))-current[i]^2/(2*sig^2)
+        prop[i] <- rnorm(1, current[i], prop_sd[i])
+        prob.prop<-invlogit(logpsi(year,mu,prop[1],prop[2],prop[3],b,K))
+        #juste pour simplifier les calculs
+        prob.current<-invlogit(logpsi(year,mu,current[1],current[2],current[3],b,K))
+        #top
+        top <-  dnorm(prop[i],0,sig,log=TRUE)+sum(dbinom(r1,n1,invlogit(prob.prop),log=TRUE))
+        bottom <-   dnorm(current[i],0,sig,log=TRUE)+sum(dbinom(r1,n1,invlogit(prob.current),log=TRUE))
       }
-      
-      else{#pour sigma_sq
-        #paramètre de la loi à prioro inverse gamma 
-        shape<-0.001
-        scale<-0.001
-        #sigma doit être positif strictement !!!!!!!on a choisit donc une normale tronquée de borne inf proche de 0 et de borne sup infini
-        #le noyau n'est pas symétrique dans ce cas !!!!!!!!
-        
-        prop[i] <- rtruncnorm(1, a=10^(-10) , b=10^10 , current[i], prop_sd[i])
-        bottom_kernel <- dtruncnorm(prop[i], a=10^(-10) , b=10^10 , current[i], prop_sd[i])  #on a pas un noyau symetrique !
-        top_kernel <- dtruncnorm(current[i], a=10^(-10) , b=10^10 , prop[i], prop_sd[i]) #on a pas un noyau symetrique !
-        
-        top <-  -(0.5*K+1+shape)*log(prop[i])-(scale+sum(b^2/2))/prop[i]+log(top_kernel)
-       
-        bottom <-  -(0.5*K+1+shape)*log(current[i])-(scale+sum(b^2/2))/current[i]+log(bottom_kernel)
-        }
-      
-      
-      
+     
       acc_prob <- exp(top - bottom)
       
       
@@ -128,4 +153,12 @@ oxford <- function(year,n0,n1,r0,r1,K, nchain = 10^4, prop_sd = c(rep(2,120),2,6
   
   return(list(chain = chain, acc_rates = acc_rates / nchain))
 }
-out <-oxford(year,n0,n1,r0,r1,K)
+
+
+
+
+
+out <-oxford(year,n1,r1, out0$chain[1,],K)
+
+for (j in 1:4)
+  plot(out$chain[,j], type = "l", ylab = j)
