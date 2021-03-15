@@ -74,10 +74,6 @@ oxford <- function(year,n0,n1,r0,r1,K, nchain = 10^4, prop_sd = c(rep(2,K),2,6,2
   
   for (iter in 1:nchain){
     current <- chain[iter,]
-    
-    
-    ## Mise a jour de alpha, beta, tau et gamma (ils suivent la même loi a priori )
-    
     for (i in 1:K+4){
       
       
@@ -89,7 +85,7 @@ oxford <- function(year,n0,n1,r0,r1,K, nchain = 10^4, prop_sd = c(rep(2,K),2,6,2
       top <-  prop[i]*r0[i]-(prop[i]^2)/(2*sig^2)+n0[i]*log(1+exp(prop[i]))
       bottom <-  current[i]*r0[i]-(current[i]^2)/(2*sig^2)+n0[i]*log(1+exp(current[i]))
       }
-      else if(k<i<K+4){#pour alpha ,beta1 ,beta2
+      else if(i<K+4){#pour alpha ,beta1 ,beta2
         
       prop[i] <- rnorm(1, current[i], prop_sd[i])
       logit.prop<-logit(year,prop[1:K],prop[K+1],prop[K+2],prop[K+3],b,K)#juste pour simplifier les calculs
@@ -111,9 +107,9 @@ oxford <- function(year,n0,n1,r0,r1,K, nchain = 10^4, prop_sd = c(rep(2,K),2,6,2
         bottom_kernel <- dtruncnorm(prop[i], a=10^(-10) , b=10^10 , current[i], prop_sd[i])  #on a pas un noyau symetrique !
         top_kernel <- dtruncnorm(current[i], a=10^(-10) , b=10^10 , prop[i], prop_sd[i]) #on a pas un noyau symetrique !
         
-        top <-  -(K+1+shape)*log(prop[i])-scale/prop[i]-sum(b^2/(2*prop[i]^2))+top_kernel
+        top <-  -(K+1+shape)*log(prop[i])-scale/prop[i]-sum(b^2/(2*prop[i]^2))+log(top_kernel)
        
-        bottom <-  -(K+1+shape)*log(current[i])-scale/current[i]-sum(b^2/(2*current[i]^2))*+bottom_kernel
+        bottom <-  -(K+1+shape)*log(current[i])-scale/current[i]-sum(b^2/(2*current[i]^2))*+log(bottom_kernel)
         }
       
       
@@ -123,7 +119,7 @@ oxford <- function(year,n0,n1,r0,r1,K, nchain = 10^4, prop_sd = c(rep(2,K),2,6,2
       
       if (runif(1) < acc_prob){
         current <- prop
-        acc_rates[j] <- acc_rates[j] + 1}
+        acc_rates[i] <- acc_rates[i] + 1}
     }
     ## Sauvegardons le nouvel etat
     chain[iter+1,] <- current
