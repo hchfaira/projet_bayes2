@@ -118,7 +118,7 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
       
       
       prop <- current
-      if(i==4){#pour sigma
+      if(i==4){#pour sigma_square 
         
         prop[i] <- rtruncnorm(1, a=0.01 , b=10^10 , current[i], prop_sd[i])
         bottom_kernel <- dtruncnorm(prop[i], a=0.01 , b=10^10 , current[i], prop_sd[i])  #on a pas un noyau symetrique !
@@ -127,6 +127,8 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
                       
         top<-dinvgamma(prop[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b^2,0,sqrt(prop[i]),log=TRUE))
         bottom <-  dinvgamma(current[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b^2,0,sqrt(current[i]),log=TRUE))
+        #mise à jou de b
+        
       }
       else{#pour alpha ,beta1 ,beta2
         
@@ -147,6 +149,9 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
         acc_rates[i] <- acc_rates[i] + 1}
     }
     ## Sauvegardons le nouvel etat
+    b<-rnorm(K,0,sqrt(current[4]))
+    
+    
     chain[iter+1,] <- current
     
   }
