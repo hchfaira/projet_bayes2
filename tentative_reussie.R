@@ -94,14 +94,20 @@ oxford0 <- function(year,n0,r0,K, nchain = 10^4, prop_sd = rep(1,120)){
   return(list(chain = chain, acc.rates = acc.rates / nchain))
 }
 out0 <-oxford0(year,n0,r0,K)
+plot(invlogit(out0$chain[,5]))
+#verifier pout p05
 
+plot(density(invlogit(out0$chain[,5])))
 
-oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
+r0[5]/n0[5]
+
+oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(0.1,4)){
   #les valeurs initiales 
   alpha <- 0
   beta1 <- 0
   beta2 <- 0
   sigma_sq <- 1
+  prop_sdb<-rep(1,K)
   b <- rep(0,K)
   init <- c(alpha,beta1,beta2,sigma_sq) #vecteurs de valeurs initiales
   
@@ -114,6 +120,7 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
   
   for (iter in 1:nchain){
     current <- chain[iter,]
+    
     for (i in 1:4){
       
       
@@ -123,36 +130,59 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
         prop[i] <- rtruncnorm(1, a=0.01 , b=10^10 , current[i], prop_sd[i])
         bottom_kernel <- dtruncnorm(prop[i], a=0.01 , b=10^10 , current[i], prop_sd[i])  #on a pas un noyau symetrique !
         top_kernel <- dtruncnorm(current[i], a=0.01, b=10^10 , prop[i], prop_sd[i]) #on a pas un noyau symetrique !
-        
+        # prop[i]<-rlnorm(1,log(current[i]),prop_sd[i])
+      
                       
-        top<-dinvgamma(prop[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b^2,0,sqrt(prop[i]),log=TRUE))
-        bottom <-  dinvgamma(current[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b^2,0,sqrt(current[i]),log=TRUE))
-        #mise à jou de b
+        top<-dinvgamma(prop[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b,0,sqrt(prop[i]),log=TRUE))+ log(top_kernel)
+        bottom <-  dinvgamma(current[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b,0,sqrt(current[i]),log=TRUE))+log(bottom_kernel)
+        # #mise à jou de b
+        # top<-sum(dnorm(b,0,sqrt(prop[i]),log=TRUE))+ log(prop[i])
+        # bottom <-  sum(dnorm(b,0,sqrt(current[i]),log=TRUE))+log(prop[i])
+        # #mise à jou de b
         
       }
       else{#pour alpha ,beta1 ,beta2
         
         prop[i] <- rnorm(1, current[i], prop_sd[i])
-        prob.prop<-invlogit(logpsi(year,mu,prop[1],prop[2],prop[3],b,K))
+        prob.prop<-logpsi(year,mu,prop[1],prop[2],prop[3],b,K)
         #juste pour simplifier les calculs
-        prob.current<-invlogit(logpsi(year,mu,current[1],current[2],current[3],b,K))
+        prob.current<-logpsi(year,mu,current[1],current[2],current[3],b,K)
         #top
         top <-  dnorm(prop[i],0,sig,log=TRUE)+sum(dbinom(r1,n1,invlogit(prob.prop),log=TRUE))
         bottom <-   dnorm(current[i],0,sig,log=TRUE)+sum(dbinom(r1,n1,invlogit(prob.current),log=TRUE))
+        # top <-  sum(dbinom(r1,n1,invlogit(prob.prop),log=TRUE))
+        # bottom <-   sum(dbinom(r1,n1,invlogit(prob.current),log=TRUE))
+        
       }
      
       acc_prob <- exp(top - bottom)
-      
+     
       
       if (runif(1) < acc_prob){
         current <- prop
         acc_rates[i] <- acc_rates[i] + 1}
     }
-    ## Sauvegardons le nouvel etat
+    chain[iter+1,] <- current
+    # propb<-b
+    # for (j in 1:K){
+    #   propb[j] <- rnorm(1, b[j], prop_sdb[j])
+    #   prob.propb<-logpsi(year[j],mu[j],current[1],current[2],current[3],propb[j],K)
+    #   #juste pour simplifier les calculs
+    #   prob.currentb<-logpsi(year[j],mu[j],current[1],current[2],current[3],b[j],K)
+    #   #top
+    #   topb <-  dnorm(propb[j],0,sqrt(current[4]),log=TRUE)+dbinom(r1[j],n1[j],invlogit(prob.propb),log=TRUE)
+    #   bottomb <-   dnorm(current[i],0,sqrt(current[4]),log=TRUE)+dbinom(r1[j],n1[j],invlogit(prob.currentb),log=TRUE)
+    #   
+    # }
+    # acc_probb <- exp(topb - bottomb)
+    # 
+    # if (runif(1) < acc_probb){
+    #   b <- propb}
+    
     b<-rnorm(K,0,sqrt(current[4]))
     
     
-    chain[iter+1,] <- current
+    
     
   }
   
@@ -162,8 +192,7 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(1,4)){
 
 
 
-
-out <-oxford(year,n1,r1, out0$chain[1,],K)
+out <-oxford(year,n1,r1, colMeans(out0$chain),K)
 
 for (j in 1:4)
-  plot(out$chain[,j], type = "l", ylab = j)
+  plot(density(out$chain[,j]), type = "l", ylab = j)
