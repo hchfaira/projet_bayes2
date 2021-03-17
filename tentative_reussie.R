@@ -190,9 +190,10 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(0.1,4)){
 }
 
 
+out <-oxford(year,n1,r1, out0$chain[10^4],K)
 
 
-out <-oxford(year,n1,r1, colMeans(out0$chain),K)
+# out <-oxford(year,n1,r1, colMeans(out0$chain),K)
 
 for (j in 1:4)
   plot(density(out$chain[,j]), type = "l", ylab = j)
