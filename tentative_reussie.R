@@ -53,108 +53,76 @@ invlogit<-function(x){
   return(exp(x)/(1+exp(x)))
 }
 
-oxford0 <- function(year,n0,r0,K, nchain = 10^4, prop_sd = rep(1,120)){
-  #les valeurs initiales 
-  
-  init <- rep(0,K)
-  #les valeurs initiales pour b,mu,beta1,beta2,sigma_sq sont données 
-  #!!!!!! pour b je ne sais pas quoi faire :( car elle suit une lois normale de paramètre(0,sigma_sq) et sigma  _sq change....
-  
-  #la chaine vide K+4 variables les mu ,alpha ,beta1 ,beta2,sigma_sg
-  
-  chain <- matrix(NA, nchain + 1, K)
-  chain[1,] <- init
-  acc.rates <- rep(0, K)
-  
-  sig<-1000 #c'est l'écart type pour les lois à priori de beta1,beta2,sugma_sq,mu
-  
-  for (iter in 1:nchain){
-    current <- chain[iter,]
-    for (i in 1:K){
-       prop <- current
-      #pour les mu !!!
-      prop[i] <- rnorm(1, current[i], prop_sd[i])
-        ##noyau symétrique
-        #les formules données
-    
-      
-      top<-dnorm(prop[i],0,sig,log=TRUE)+dbinom(r0[i],n0[i],invlogit(prop[i]),log=TRUE)
-      bottom<-dnorm(current[i],0,sig,log=TRUE)+dbinom(r0[i],n0[i],invlogit(current[i]),log=TRUE)
-     acc.prob<-exp(top-bottom)
-      
-      if (runif(1) < acc.prob){
-        current <- prop
-        acc.rates[i] <- acc.rates[i] + 1}
-    }
-    ## Sauvegardons le nouvel etat
-    chain[iter+1,] <- current
-    
-  }
-  
-  return(list(chain = chain, acc.rates = acc.rates / nchain))
-}
-out0 <-oxford0(year,n0,r0,K)
-plot(invlogit(out0$chain[,5]))
-#verifier pout p05
 
-plot(density(invlogit(out0$chain[,5])))
-
-r0[5]/n0[5]
-
-oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(0.1,4)){
+oxford <- function(year,n1,r1,r0,n0,K, nchain = 10^4, prop_sd =c(1,2,3,1,4,1)){
   #les valeurs initiales 
   alpha <- 0
   beta1 <- 0
   beta2 <- 0
   sigma_sq <- 1
-  prop_sdb<-rep(1,K)
+  mu<- rep(0,K)
   b <- rep(0,K)
-  init <- c(alpha,beta1,beta2,sigma_sq) #vecteurs de valeurs initiales
   
+  init <- c(alpha,beta1,beta2,sigma_sq,mu,b) #vecteurs de valeurs initiales
   
-  chain <- matrix(NA, nchain + 1, 4)
+  chain <- matrix(NA, nchain + 1, 2*K+4)
   chain[1,] <- init
-  acc_rates <- rep(0, 4)
+  acc_rates <- rep(0, 2*K+4)
   
   sig<-1000 #c'est l'écart type pour les lois à priori de beta1,beta2,sugma_sq,mu
   
   for (iter in 1:nchain){
     current <- chain[iter,]
     
+  
     for (i in 1:4){
-      
-      
       prop <- current
       if(i==4){#pour sigma_square 
         
-        prop[i] <- rtruncnorm(1, a=0.01 , b=10^10 , current[i], prop_sd[i])
-        bottom_kernel <- dtruncnorm(prop[i], a=0.01 , b=10^10 , current[i], prop_sd[i])  #on a pas un noyau symetrique !
-        top_kernel <- dtruncnorm(current[i], a=0.01, b=10^10 , prop[i], prop_sd[i]) #on a pas un noyau symetrique !
-        # prop[i]<-rlnorm(1,log(current[i]),prop_sd[i])
-      
+        prop[i] <-rlnorm(1, current[i], prop_sd[i])
+        
                       
-        top<-dinvgamma(prop[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b,0,sqrt(prop[i]),log=TRUE))+ log(top_kernel)
-        bottom <-  dinvgamma(current[i],0.001,rate=1000,log=TRUE)+sum(dnorm(b,0,sqrt(current[i]),log=TRUE))+log(bottom_kernel)
-        # #mise à jou de b
-        # top<-sum(dnorm(b,0,sqrt(prop[i]),log=TRUE))+ log(prop[i])
-        # bottom <-  sum(dnorm(b,0,sqrt(current[i]),log=TRUE))+log(prop[i])
-        # #mise à jou de b
+        top<-dinvgamma(prop[i],0.001,rate=1000,log=TRUE)+sum(dnorm(prop[K+5:2*K+4],0,sqrt(prop[i]),log=TRUE))+ log(prop[i])
+        bottom <-  dinvgamma(current[i],0.001,rate=1000,log=TRUE)+sum(dnorm(current[K+5:2*K+4],0,sqrt(current[i]),log=TRUE))+log(current[i])
+       
         
       }
       else{#pour alpha ,beta1 ,beta2
         
         prop[i] <- rnorm(1, current[i], prop_sd[i])
-        prob.prop<-logpsi(year,mu,prop[1],prop[2],prop[3],b,K)
+        prob.prop<-logpsi(year,prop[5:K+4],prop[1],prop[2],prop[3],prop[K+5:2*K+4],K)
         #juste pour simplifier les calculs
-        prob.current<-logpsi(year,mu,current[1],current[2],current[3],b,K)
+        prob.current<-logpsi(year,current[5:K+4],current[1],current[2],current[3],prop[K+5:2*K+4],K)
         #top
         top <-  dnorm(prop[i],0,sig,log=TRUE)+sum(dbinom(r1,n1,invlogit(prob.prop),log=TRUE))
         bottom <-   dnorm(current[i],0,sig,log=TRUE)+sum(dbinom(r1,n1,invlogit(prob.current),log=TRUE))
-        # top <-  sum(dbinom(r1,n1,invlogit(prob.prop),log=TRUE))
-        # bottom <-   sum(dbinom(r1,n1,invlogit(prob.current),log=TRUE))
+     
+        
+      }}
+      #pour les mui
+      for (i in 5:K+4){
+        prop <- current
+        prop[i] <- rnorm(1, current[i], prop_sd[5])
+        prob.prop<-logpsi(year[i-4],prop[i],prop[1],prop[2],prop[3],prop[i+K],K)
+        #juste pour simplifier les calculs
+        prob.current<-logpsi(year[i-4],current[i],current[1],current[2],current[3],current[i+K],K)
+        top<-dnorm(prop[i],0,sig,log=TRUE)+dbinom(r0[i],n0[i],invlogit(prop[i]),log=TRUE)+dbinom(r1[i],n1[i],invlogit(prob.prop),log=TRUE)
+        bottom<-dnorm(current[i],0,sig,log=TRUE)+dbinom(r0[i],n0[i],invlogit(current[i]),log=TRUE)+dbinom(r1[i],n1[i],invlogit(prob.current),log=TRUE)
         
       }
-     
+      #pour les bi
+      for (i in K+5:2*K+4){
+        prop <- current
+        prop[i] <- rnorm(1, current[i], prop_sd[6])
+        prob.prop<-logpsi(year[i],prop[i-K],current[1],current[2],current[3],prop[i],K)
+        #juste pour simplifier les calculs
+        prob.current<-logpsi(year[i],prop[i-K],current[1],current[2],current[3],current[j],K)
+        #top
+        top <-  dnorm(prop[i],0,sqrt(current[4]),log=TRUE)+dbinom(r1[i],n1[i],invlogit(prob.prop),log=TRUE)
+        bottom <-   dnorm(current[i],0,sqrt(current[4]),log=TRUE)+dbinom(r1[i],n1[i],invlogit(prob.current),log=TRUE)
+        
+      }
+      
       acc_prob <- exp(top - bottom)
      
       
@@ -163,23 +131,6 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(0.1,4)){
         acc_rates[i] <- acc_rates[i] + 1}
     }
     chain[iter+1,] <- current
-    # propb<-b
-    # for (j in 1:K){
-    #   propb[j] <- rnorm(1, b[j], prop_sdb[j])
-    #   prob.propb<-logpsi(year[j],mu[j],current[1],current[2],current[3],propb[j],K)
-    #   #juste pour simplifier les calculs
-    #   prob.currentb<-logpsi(year[j],mu[j],current[1],current[2],current[3],b[j],K)
-    #   #top
-    #   topb <-  dnorm(propb[j],0,sqrt(current[4]),log=TRUE)+dbinom(r1[j],n1[j],invlogit(prob.propb),log=TRUE)
-    #   bottomb <-   dnorm(current[i],0,sqrt(current[4]),log=TRUE)+dbinom(r1[j],n1[j],invlogit(prob.currentb),log=TRUE)
-    #   
-    # }
-    # acc_probb <- exp(topb - bottomb)
-    # 
-    # if (runif(1) < acc_probb){
-    #   b <- propb}
-    
-    b<-rnorm(K,0,sqrt(current[4]))
     
     
     
@@ -190,7 +141,7 @@ oxford <- function(year,n1,r1,mu,K, nchain = 10^4, prop_sd = rep(0.1,4)){
 }
 
 
-out <-oxford(year,n1,r1, out0$chain[10^4],K)
+out <-oxford(year,n1,r1,r0,n0,K)
 
 
 # out <-oxford(year,n1,r1, colMeans(out0$chain),K)

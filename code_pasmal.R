@@ -150,18 +150,25 @@ oxford <- function(year, n1, n0, r1, r0, nchain = 10^4, prop_sd = c(0.05, 0.03, 
   
   out <- oxford(year, n1, n0, r1, r0)
   out$chain <- out$chain[-(1:1000),]
-  
+  text=c("alpha", "beta1", "beta2", "sigma2")
   par(mfrow = c(4, 2), mar = c(4, 5, 0.5, 0.5))
   for (j in 1:3){
-    plot(out$chain[,j], type = "l", main = "")
+    plot(out$chain[,j], type = "l", main = "",ylab=text[j])
     plot(density(out$chain[,j]), type = "l", main = "")
   }
     
-  plot(out$chain[,244], type = "l", main = "")
+  plot(out$chain[,244], type = "l", main = "",ylab=text[4])
   plot(density(out$chain[,244]), type = "l", main = "")
   
   
   moy_alpha <- mean(out$chain[8000:9001,1])
   moy_beta1 <- mean(out$chain[8000:9001,2])
   moy_beta2 <- mean(out$chain[8000:9001,3])
-  moy_sigma <- mean(sqrt(out$chain[8000:9001,244]))
+  moy_sigma2 <- mean(out$chain[8000:9001,244])
+  
+sd_alpha <- sqrt(mean(out$chain[8000:9001,1]^2)-mean(out$chain[8000:9001,1])^2)
+sd_beta1 <- sqrt(mean(out$chain[8000:9001,2]^2)-mean(out$chain[8000:9001,2])^2)
+sd_beta2 <- sqrt(mean(out$chain[8000:9001,3]^2)-mean(out$chain[8000:9001,3])^2)
+sd_sigma2 <- sqrt(mean(out$chain[8000:9001,4]^2)-mean(out$chain[8000:9001,4])^2)
+acf(out$chain[,c(1,2,3,244)],type=c('correlation'))
+acf

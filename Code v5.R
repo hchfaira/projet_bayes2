@@ -1,3 +1,4 @@
+
 library(rstanarm) # for the function logit() and invlogit()
 library(invgamma) # for the invgamma
 
@@ -74,7 +75,7 @@ f_p1 <- function(mu, b, para, year ){
 
 
 fatigue <- function(year = year, n0 = n0, n1 = n1, r0 = r0, r1 = r1,
-                      K = 120, prop.sd = c(0.1,0.05,0.01,0.005,0.005), nchain = 10^4, priors = c(1, 0.1, 1, 1, 0, 1000)){
+                     K = 120, prop.sd = c(0.1,0.005,0.01,0.005,0.005), nchain = 10^4, priors = c(1, 0.1, 1, 1, 0, 1000)){
   mu <- rep(0, K)
   b <- rep(0, K)
   alpha <- 0
@@ -155,10 +156,12 @@ fatigue <- function(year = year, n0 = n0, n1 = n1, r0 = r0, r1 = r1,
         current <- prop # update
         acc.rates[i] <- acc.rates[i] + 1
       }
+    
     }
     
     #update of sigma!
-    sigma2 <- rinvgamma(1,10^(-3)+K/2, scale = 10^(-3)+sum(current[(K+1):(2*K)]^2)/2)
+    
+    sigma2 <- 1/rgamma(1,10^(-3)+K/2, rate=10^(-3)+sum(current[(K+1):(2*K)]^2)/2)
     
     chain[iter+1,] <- current
     chain[iter+1, 2*K + 4] <- sigma2
@@ -166,8 +169,7 @@ fatigue <- function(year = year, n0 = n0, n1 = n1, r0 = r0, r1 = r1,
   return(list(chain = chain, acc.rates = acc.rates / nchain))
 }
 
-result <- fatigue(year = year, n0 = n0, n1 = n1, r0 = r0, r1 = r1,
-        K = 120, prop.sd = c(2,2,6,2,2), nchain = 10^4, priors = c(1, 1, 1, 1, 0, 1000))
+result <- fatigue(year = year, n0 = n0, n1 = n1, r0 = r0, r1 = r1)
 
 chainval <- result$chain[1001:10001,]
 means <- colSums(chainval)/9001
